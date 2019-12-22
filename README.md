@@ -58,6 +58,20 @@ hue=.1
 1. 过滤低于阈值的bbox的obj score
 2. 使用nms过滤相邻的bbox
 
+## yolo权重存储
+
+权重只是存储为浮点数，没有任何东西可以指导我们它们属于哪一层。
+
+权重仅属于两种类型的层，即批处理规范层或卷积层。
+
+当batcn norm出现在convolutional块中时，就没有偏差。但是，当没有batch norm时，必须从文件中读取bias“权重”。
+
+权重文件的前160个字节存储5个int32值，这些值构成文件的头。
+
+![](https://blog.paperspace.com/content/images/2018/04/wts-1.png)
+
+
+
 ## inference
 
 https://blog.paperspace.com/how-to-implement-a-yolo-object-detector-in-pytorch/

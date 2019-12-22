@@ -197,6 +197,83 @@ class Darknet(nn.Module):
             outputs[i] = x
         return detections
 
+    def load_weights(self, weightfile):
+        # 权重文件的前160个字节存储5个int32值，这些值构成文件的头。
+        with open(weightfile, 'rb') as fp:
+            # The first 5 values are header information
+            # 1. Major version number
+            # 2. Minor Version Number
+            # 3. Subversion number
+            # 4,5. Images seen by the network (during training)
+            header = np.fromfile(fp, dtype=np.int32, count=5)
+            self.header = torch.from_numpy(header)
+            self.seen = self.header[3]
+            # 剩余权重
+            weights = np.fromfile(fp, dtype=np.float32)
+
+        ptr = 0  # ptr以跟踪权重数组中的位置
+        for i in range(len(self.module_list)):
+            module_type = self.blocks[i+1]['type']
+            if module_type =='convolutional':
+                # nn.Sequential
+                model = self.module_list[i]
+
+                batch_normalize = int(self.blocks[i+1].get('batch_normalize', 0))
+
+                conv = model[0]
+
+                # 加载偏差，要么加载batch norm的bias，要么加载conv的bias
+                if batch_normalize:
+                    bn = model[1]
+
+                    num_bn_biases = bn.bias.numel()
+
+                    bn_biases = torch.from_numpy(weights[ptr:ptr+num_bn_biases])
+                    ptr += num_bn_biases
+
+                    bn_weights = torch.from_numpy(weights[ptr:ptr+num_bn_biases])
+                    ptr += num_bn_biases
+
+                    bn_running_mean = torch.from_numpy(weights[ptr: ptr + num_bn_biases])
+                    ptr += num_bn_biases
+
+                    bn_running_var = torch.from_numpy(weights[ptr: ptr + num_bn_biases])
+                    ptr += num_bn_biases
+
+                    bn_biases = bn_biases.view_as(bn.bias.data)
+                    bn_weights = bn_weights.view_as(bn.weight.data)
+                    bn_running_mean = bn_running_mean.view_as(bn.running_mean)
+                    bn_running_var = bn_running_var.view_as(bn.running_var)
+
+                    # Copy the data to model
+                    bn.bias.data.copy_(bn_biases)
+                    bn.weight.data.copy_(bn_weights)
+                    bn.running_mean.copy_(bn_running_mean)
+                    bn.running_var.copy_(bn_running_var)
+
+                else:
+                    # Number of biases
+                    num_biases = conv.bias.numel()
+
+                    # Load the weights
+                    conv_biases = torch.from_numpy(weights[ptr: ptr + num_biases])
+                    ptr = ptr + num_biases
+
+                    # reshape the loaded weights according to the dims of the model weights
+                    conv_biases = conv_biases.view_as(conv.bias.data)
+
+                    # Finally copy the data
+                    conv.bias.data.copy_(conv_biases)
+
+                num_weights = conv.weight.numel()
+
+                conv_weights = torch.from_numpy(weights[ptr: ptr+num_weights])
+                ptr = ptr+num_weights
+
+                conv_weights = conv_weights.view_as(conv.weight.data)
+                conv.weight.data.copy_(conv_weights)
+
+
 def get_test_input():
     img = cv2.imread('dog-cycle-car.png')
     img = cv2.resize(img, (416, 416))
@@ -219,3 +296,5 @@ if __name__ == '__main__':
     inp = inp.cuda()
     pred = model(inp)
     print(pred, pred.shape)
+
+    model.load_weights('yolov3.weights')
