@@ -298,3 +298,6 @@ if __name__ == '__main__':
     print(pred, pred.shape)
 
     model.load_weights('yolov3.weights')
+    pred = model(inp)
+    results = write_results(pred, 0.3, 80, )
+    print(results)
