@@ -55,7 +55,7 @@ def predict_transform(prediction: torch.Tensor,
         anchors = anchors.cuda()
 
     anchors = anchors.repeat(grid_size*grid_size, 1).unsqueeze(0)
-    prediction[:, :, 2:4] = torch.exp(prediction[:, :, 2:4]*anchors)
+    prediction[:, :, 2:4] = torch.exp(prediction[:, :, 2:4])*anchors
 
     prediction[:, :, 5: 5 + num_classes] = torch.sigmoid((prediction[:, :, 5: 5+num_classes]))
 

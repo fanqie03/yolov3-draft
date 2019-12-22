@@ -159,7 +159,8 @@ class Darknet(nn.Module):
                 layers = [int(a) for a in layers]
 
                 if layers[0] > 0:
-                    x = outputs[i + layers[0]]
+                    # x = outputs[i + layers[0]]
+                    layers[0] = layers[0] - i
 
                 if len(layers) == 1:
                     x = outputs[i+layers[0]]
@@ -213,4 +214,8 @@ if __name__ == '__main__':
     model = Darknet('yolov3.cfg')
     inp = get_test_input()
     pred = model(inp)
-    print(pred)
+    print(pred, pred.shape)
+    model = model.cuda()
+    inp = inp.cuda()
+    pred = model(inp)
+    print(pred, pred.shape)
