@@ -241,16 +241,16 @@ det_names = pd.Series(imlist).apply(lambda x: "{}/det_{}".format(args.det, x.spl
 list(map(cv2.imwrite, det_names, loaded_ims))
 end = time.time()
 
-print("SUMMARY")
-print("----------------------------------------------------------")
-print("{:25s}: {}".format("Task", "Time Taken (in seconds)"))
-print()
-print("{:25s}: {:2.3f}".format("Reading addresses", load_batch - read_dir))
-print("{:25s}: {:2.3f}".format("Loading batch", start_det_loop - load_batch))
-print("{:25s}: {:2.3f}".format("Detection (" + str(len(imlist)) + " images)", output_recast - start_det_loop))
-print("{:25s}: {:2.3f}".format("Output Processing", class_load - output_recast))
-print("{:25s}: {:2.3f}".format("Drawing Boxes", end - draw))
-print("{:25s}: {:2.3f}".format("Average time_per_img", (end - load_batch) / len(imlist)))
-print("----------------------------------------------------------")
+print(
+    f"""SUMMARY
+----------------------------------------------------------
+{"Task":25s}: {"Time Taken (in seconds)"}
+{"Reading addresses":25s}: {load_batch - read_dir:2.3f}
+{"Detection (" + str(len(imlist)) + " images)":25s}: {output_recast - start_det_loop:2.3f}
+{"Output Processing":25s}: {class_load - output_recast:2.3f}
+{"Drawing Boxes":25s}: {end - draw:2.3f}
+{"Average time_per_img":25s}: {(end - load_batch) / len(imlist):2.3f}
+----------------------------------------------------------
+""")
 
 torch.cuda.empty_cache()
