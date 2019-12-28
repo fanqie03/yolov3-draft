@@ -1,5 +1,9 @@
 # yolov3-draft
 
+## 目录结构
+
+- pallete - 颜色
+
 ## yolov3.cfg
 
 ```cfg

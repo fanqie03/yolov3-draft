@@ -102,6 +102,15 @@ def bbox_iou(box1, box2):
 
 
 def write_results(prediction, confidence, num_classes, nms_conf=0.4):
+    """
+    函数的结果为dx8的张量，每个检测有8个属性，
+    即检测所属批次图像的索引、四个location, object score, max class score, max class score index
+    :param prediction:
+    :param confidence:
+    :param num_classes:
+    :param nms_conf:
+    :return:
+    """
     # 过滤分数低的bbox，并保留他们，方便后续向量化操作（每张图过滤后的数目不同）
     conf_mask = (prediction[:, :, 4] > confidence).float().unsqueeze(2)
     prediction = prediction * conf_mask
