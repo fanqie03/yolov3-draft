@@ -67,13 +67,14 @@ def predict_transform(prediction: torch.Tensor,
 
 
 def unique(tensor):
-    tensor_np = tensor.detach().cpu().numpy()
-    unique_np = np.unique(tensor_np)
-    unique_tensor = torch.from_numpy(unique_np)
-
-    tensor_res = tensor.new(unique_tensor.shape)
-    tensor_res.copy_(unique_tensor)
-    return tensor_res
+    # tensor_np = tensor.detach().cpu().numpy()
+    # unique_np = np.unique(tensor_np)
+    # unique_tensor = torch.from_numpy(unique_np)
+    #
+    # tensor_res = tensor.new(unique_tensor.shape)
+    # tensor_res.copy_(unique_tensor)
+    # return tensor_res
+    return torch.unique(tensor)
 
 
 def bbox_iou(box1, box2):
@@ -124,14 +125,14 @@ def write_results(prediction, confidence, num_classes, nms_conf=0.4):
         # 每个边界框有85个属性，其中80个是类别score。
         # 只关心最高分的class score，
         # 每行删除80个类别分数，添加具有最大值的class score的索引和class score
-        max_conf, max_conf_score = torch.max(image_pred[:, 5:5 + num_classes], 1)
+        max_conf, max_conf_index = torch.max(image_pred[:, 5:5 + num_classes], 1)
         max_conf = max_conf.float().unsqueeze(1)
-        max_conf_score = max_conf_score.float().unsqueeze(1)
-        seq = (image_pred[:, :5], max_conf, max_conf_score)
+        max_conf_index = max_conf_index.float().unsqueeze(1)
+        seq = (image_pred[:, :5], max_conf, max_conf_index)
         image_pred = torch.cat(seq, 1)
 
         # 过滤分数低的bbox，可能存在没有obj score大于阈值的bbox
-        # debug
+        # debug, torch.nonzero出来的是非零元素的索引
         non_zero_ind = torch.nonzero(image_pred[:, 4])
         try:
             image_pred_ = image_pred[non_zero_ind.squeeze(), :].view(-1, 7)
@@ -167,17 +168,18 @@ def write_results(prediction, confidence, num_classes, nms_conf=0.4):
                 except IndexError:
                     break
 
-                # 消除iou > nms_conf 的bbox
+                # 将iou > threshold 的bbox置为零， 留下iou < threshold的bbox
                 iou_mask = (ious < nms_conf).float().unsqueeze(1)
-                image_pred_class[i + 1, :] *= iou_mask
-
+                image_pred_class[i + 1:] *= iou_mask
+                # 消除iou > nms_conf 的bbox， 留下iou < threshold的bbox
                 non_zero_ind = torch.nonzero(image_pred_class[:, 4]).squeeze()
                 image_pred_class = image_pred_class[non_zero_ind].view(-1, 7)
 
             batch_ind = image_pred_class.new(image_pred_class.size(0), 1).fill_(ind)
             #Repeat the batch_id for as many detections of the class cls in the image
             seq = batch_ind, image_pred_class
-
+            # 函数的结果为dx8的张量，每个检测有8个属性，
+            # 即检测所属批次图像的索引、四个location, object score, max class score, max class score index
             if not write:
                 output = torch.cat(seq,1)
                 write = True
