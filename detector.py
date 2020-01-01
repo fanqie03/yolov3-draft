@@ -24,7 +24,7 @@ def arg_parse():
     parser = argparse.ArgumentParser(description='YOLO v3 Detection Module')
 
     parser.add_argument("--images", dest='images', help="Image / Directory containing images to perform detection upon",
-                        default="imgs", type=str)
+                        default="dog-cycle-car.png", type=str)
     parser.add_argument("--det", dest='det', help="Image / Directory to store detections to",
                         default="det", type=str)
     parser.add_argument("--bs", dest="bs", help="Batch size", type=int, default=1)
@@ -39,42 +39,9 @@ def arg_parse():
     parser.add_argument("--reso", dest='reso', help="Input resolution of the network. "
                                                     "Increase to increase accuracy. Decrease to increase speed",
                         default="416", type=str)
+    parser.add_argument("--device", default="cpu")
 
     return parser.parse_args()
-
-
-def load_classes(namesfile):
-    fp = open(namesfile, "r")
-    names = fp.read().split("\n")[:-1]
-    return names
-
-
-def letterbox_image(img, inp_dim):
-    '''resize image with unchanged aspect ratio using padding'''
-    img_w, img_h = img.shape[1], img.shape[0]
-    w, h = inp_dim
-    new_w = int(img_w * min(w / img_w, h / img_h))
-    new_h = int(img_h * min(w / img_w, h / img_h))
-    resized_image = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
-
-    canvas = np.full((inp_dim[1], inp_dim[0], 3), 128)
-
-    canvas[(h - new_h) // 2:(h - new_h) // 2 + new_h, (w - new_w) // 2:(w - new_w) // 2 + new_w, :] = resized_image
-
-    return canvas
-
-
-def prep_image(img, inp_dim):
-    """
-    Prepare image for inputting to the neural network.
-
-    Returns a Variable
-    """
-
-    img = cv2.resize(img, (inp_dim, inp_dim))
-    img = img[:, :, ::-1].transpose((2, 0, 1)).copy()
-    img = torch.from_numpy(img).float().div(255.0).unsqueeze(0)
-    return img
 
 
 def draw_func(x, results, color):
@@ -97,11 +64,12 @@ batch_size = args.bs
 confidence = args.confidence
 nms_thesh = args.nms_thresh
 start = 0
-CUDA = torch.cuda.is_available()
+CUDA = torch.cuda.is_available() and args.device != "cpu"
 
 num_classes = 80  # For COCO
 classes = load_classes("coco.names")
 
+# 初始化网络和加载权重
 # Set up the neural network
 print("Loading network.....")
 model = Darknet(args.cfgfile)
@@ -120,6 +88,7 @@ if CUDA:
 # Set the model in evaluation mode
 model.eval()
 
+# 读取图片，尝试读取文件夹下的图片，不行直接单个图片，保存在imlist数组里
 read_dir = time.time()
 # Detection phase
 try:
@@ -131,14 +100,18 @@ except FileNotFoundError:
     print("No file or directory with the name {}".format(images))
     exit()
 
+# 确认输出目录是否存在
 if not os.path.exists(args.det):
     os.makedirs(args.det)
 
+# 一次性读取图片
 load_batch = time.time()
 loaded_ims = [cv2.imread(x) for x in imlist]
 
+# resize, bgr->rgb, div 255, add dim ...
 # PyTorch Variables for images
-im_batches = list(map(prep_image, loaded_ims, [inp_dim for x in range(len(imlist))]))
+im_batches = list(map(letterbox_image, loaded_ims, [(inp_dim, inp_dim) for x in range(len(imlist))]))
+im_batches = list(map(prep_image, im_batches, [inp_dim for x in range(len(imlist))]))
 
 # List containing dimensions of original images
 im_dim_list = [(x.shape[1], x.shape[0]) for x in loaded_ims]
@@ -164,9 +137,9 @@ for i, batch in enumerate(im_batches):
     start = time.time()
     if CUDA:
         batch = batch.cuda()
-
-    prediction = model(Variable(batch, volatile=True))
-
+    # !!! 此时输入模型的图片是经过resize的
+    prediction = model(batch)
+    # write_results输出的bbox坐标是针对resize过后的图片
     prediction = write_results(prediction, confidence, num_classes, nms_conf=nms_thesh)
 
     end = time.time()
